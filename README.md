@@ -53,7 +53,7 @@ python main-DREDDA.py train
 
 Relavant files will be downloaded to `download/`. The resulting checkpoints will be saved to `train_dir/default_config/`
 
-The following example shows how to modify the default behavior
+The following example shows how to change the default behavior
 ```
 python main-DREDDA.py train \
   --source_dataset_name CRISPRi \
