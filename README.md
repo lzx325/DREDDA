@@ -65,7 +65,6 @@ python main-DREDDA.py train \
   --ddc_coeff 0.1 \
   --seed 41 
 ```
-The resulting checkpoints will be saved to `OUT_DIR`.
 
 To test a specific checkpoint, please use
 ```
