@@ -5,14 +5,11 @@ This repository contains the implementation of DREDDA from
 
 ```
 Zhongxiao Li, Antonella Napolitano, Monica Fedele, Xin Gao*, Francesco Napolitano* 
-"DeeReCT-APA: Prediction of Alternative Polyadenylation Site Usage Through Deep Learning" bioRxiv, 2023
+"AI identifies potent inducers of breast cancer stem cell differentiation based on adversarial learning from gene expression data" bioRxiv, 2023
 ```
 
-If you use our work in your research, please cite our paper, which is now available on [bioRxiv](https://www.biorxiv.org/)
+If you use our work in your research, please cite our paper, which is now available on [bioRxiv](https://www.biorxiv.org/content/10.1101/2023.08.21.554075v1)
 
-```
-[cite bioRxiv item]
-```
 
 <div align="center">
   <img src="./resources/fig1.png" width="600" height="250">
