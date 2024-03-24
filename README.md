@@ -24,7 +24,7 @@ If you use our work in your research, please cite our paper, which is now availa
   Fig. 2 The DREDDA model architecture includes one encoder for each dataset and a shared decoder; the resulting profiles from the source domain are sent to the main task classifier (positively weighted in the overall loss function), while both source and target domain profiles are sent to the adversarial classifier (negatively weighted).
 </div>
 
-## Prerequisites
+## Installation
 The code is tested with the following dependencies:
 - Python 3.7.10
 - Pytorch 1.6.0
