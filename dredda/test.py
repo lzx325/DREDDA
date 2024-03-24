@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats
 
+
 def mean_reciprocal_rank(rs):
     """Score is reciprocal of the rank of the first relevant item
 
@@ -30,11 +31,13 @@ def mean_reciprocal_rank(rs):
     """
     rs = [np.asarray(r).nonzero()[0] for r in rs]
 
-    return np.mean([ 
-        np.mean([1. / (r[i] + 1) for i in range(len(r))]) 
-        if r.size else 0. 
-        for r in rs
-    ])
+    return np.mean(
+        [
+            np.mean([1.0 / (r[i] + 1) for i in range(len(r))]) if r.size else 0.0
+            for r in rs
+        ]
+    )
+
 
 def precision_at_k(r, k):
     """Score is precision @ k
@@ -67,7 +70,7 @@ def precision_at_k(r, k):
     assert k >= 1
     r = np.asarray(r)[:k] != 0
     if r.size != k:
-        raise ValueError('Relevance score length < k')
+        raise ValueError("Relevance score length < k")
     return np.mean(r)
 
 
@@ -93,7 +96,7 @@ def average_precision(r):
     r = np.asarray(r) != 0
     out = [precision_at_k(r, k + 1) for k in range(r.size) if r[k]]
     if not out:
-        return 0.
+        return 0.0
     # the total number of ground truth positive will be the number of positive elements in r
     return np.mean(out)
 
@@ -159,8 +162,8 @@ def dcg_at_k(r, k, method=0):
         elif method == 1:
             return np.sum(r / np.log2(np.arange(2, r.size + 2)))
         else:
-            raise ValueError('method must be 0 or 1.')
-    return 0.
+            raise ValueError("method must be 0 or 1.")
+    return 0.0
 
 
 def ndcg_at_k(r, k, method=0):
@@ -197,11 +200,13 @@ def ndcg_at_k(r, k, method=0):
     # full r is sorted
     dcg_max = dcg_at_k(sorted(r, reverse=True), k, method)
     if not dcg_max:
-        return 0.
+        return 0.0
     return dcg_at_k(r, k, method) / dcg_max
+
 
 class PredictionEvaluator(object):
     """This class holds the main datasets from LINCS and DECCODE to evaluate the DREDDA model's performance"""
+
     def __init__(
         self,
         full_prediction_df,
@@ -209,111 +214,137 @@ class PredictionEvaluator(object):
         siginfo_fp,
         ref_score_fp=None,
         exp_results_fp=None,
-        deccode_plurip_fp=None
-        
+        deccode_plurip_fp=None,
     ):
         self.df = dict()
-        assert set(full_prediction_df.index)==set(features_df.index)
-        self.df["prediction"]=full_prediction_df
-        self.df["features"]=features_df
+        assert set(full_prediction_df.index) == set(features_df.index)
+        self.df["prediction"] = full_prediction_df
+        self.df["features"] = features_df
 
-        siginfo_df = pd.read_csv(siginfo_fp,sep='\t',index_col=0)
-        self.df["siginfo"]=siginfo_df
-        
+        siginfo_df = pd.read_csv(siginfo_fp, sep="\t", index_col=0)
+        self.df["siginfo"] = siginfo_df
+
         if ref_score_fp:
             # evaluation results
             score1 = pd.read_csv(ref_score_fp, index_col=0).iloc[:, 0]
-            self.df["ref_score"]=score1
+            self.df["ref_score"] = score1
 
         if exp_results_fp:
             # evaluation results
             exp_results = pd.read_csv(exp_results_fp, index_col=0)
-            self.df["exp_results"]=exp_results
-        
+            self.df["exp_results"] = exp_results
+
         if deccode_plurip_fp:
             # evaluation results
             deccode_plurip = pd.read_csv(deccode_plurip_fp, index_col=0)
-            deccode_plurip_cell_agg = deccode_plurip.groupby(["pert_name","cell_id"]).mean()
-            deccode_plurip_mean = deccode_plurip_cell_agg.reset_index().groupby(["pert_name"]).mean()
-            self.df["deccode_plurip_cell_agg"]=deccode_plurip_cell_agg
-            self.df["deccode_plurip_mean"]=deccode_plurip_mean
+            deccode_plurip_cell_agg = deccode_plurip.groupby(
+                ["pert_name", "cell_id"]
+            ).mean()
+            deccode_plurip_mean = (
+                deccode_plurip_cell_agg.reset_index().groupby(["pert_name"]).mean()
+            )
+            self.df["deccode_plurip_cell_agg"] = deccode_plurip_cell_agg
+            self.df["deccode_plurip_mean"] = deccode_plurip_mean
 
         self.compute_DREDDA_score()
 
     def compute_DREDDA_score(self):
         """Average the model's prediction for each perturbation and cell line."""
-        prediction_df_copy=self.df["prediction"].copy()
-        prediction_df_copy.insert(0,"pert_name",self.df["siginfo"]["pert_iname"])
-        prediction_df_copy.insert(1,"pert_id",self.df["siginfo"]["pert_id"])
-        prediction_df_copy.insert(2,"cell_id",self.df["siginfo"]["cell_id"])
+        prediction_df_copy = self.df["prediction"].copy()
+        prediction_df_copy.insert(0, "pert_name", self.df["siginfo"]["pert_iname"])
+        prediction_df_copy.insert(1, "pert_id", self.df["siginfo"]["pert_id"])
+        prediction_df_copy.insert(2, "cell_id", self.df["siginfo"]["cell_id"])
 
-        prediction_pert_cell_agg=prediction_df_copy.groupby(["pert_name","cell_id"]).mean()
-        prediction_pert_mean=prediction_pert_cell_agg.reset_index().groupby(["pert_name"]).mean()
+        prediction_pert_cell_agg = prediction_df_copy.groupby(
+            ["pert_name", "cell_id"]
+        ).mean()
+        prediction_pert_mean = (
+            prediction_pert_cell_agg.reset_index().groupby(["pert_name"]).mean()
+        )
 
-        self.df.update({
-            'prediction_pert_cell_agg':prediction_pert_cell_agg,
-            'prediction_pert_mean':prediction_pert_mean
-        })
-    
-    def save_prediction(self,out_dir,n_drugs=30):
+        self.df.update(
+            {
+                "prediction_pert_cell_agg": prediction_pert_cell_agg,
+                "prediction_pert_mean": prediction_pert_mean,
+            }
+        )
+
+    def save_prediction(self, out_dir, n_drugs=30):
         from dredda.helpers import temp_seed
-        os.makedirs(out_dir,exist_ok=True)
+
+        os.makedirs(out_dir, exist_ok=True)
 
         # formatted output
-        pert_id_by_iname=self.df["siginfo"].query("pert_type=='trt_cp'").groupby(["pert_iname"])["pert_id"].first()
-        concat_df = pd.merge(self.df["prediction_pert_mean"],pert_id_by_iname,left_on="pert_name",right_index=True,how="left").reset_index()
-        concat_df["pert_id_and_name"]=concat_df.apply(lambda x: "%s(%s)"%(x["pert_id"],x["pert_name"]), axis=1)
+        pert_id_by_iname = (
+            self.df["siginfo"]
+            .query("pert_type=='trt_cp'")
+            .groupby(["pert_iname"])["pert_id"]
+            .first()
+        )
+        concat_df = pd.merge(
+            self.df["prediction_pert_mean"],
+            pert_id_by_iname,
+            left_on="pert_name",
+            right_index=True,
+            how="left",
+        ).reset_index()
+        concat_df["pert_id_and_name"] = concat_df.apply(
+            lambda x: "%s(%s)" % (x["pert_id"], x["pert_name"]), axis=1
+        )
 
-        concat_df=concat_df.sort_values("prediction_expected_classes",ascending=False).set_index("pert_name")
-        concat_df.index.name=None
-        
+        concat_df = concat_df.sort_values(
+            "prediction_expected_classes", ascending=False
+        ).set_index("pert_name")
+        concat_df.index.name = None
 
         # save the full list
-        fields = ["prediction_expected_classes","pert_id","pert_id_and_name"]
-        concat_df[fields].to_csv(os.path.join(out_dir,"full_list.csv"),sep=',')
-        
-    
+        fields = ["prediction_expected_classes", "pert_id", "pert_id_and_name"]
+        concat_df[fields].to_csv(os.path.join(out_dir, "full_list.csv"), sep=",")
+
     def evaluate_with_reference_prediction(self):
-        """ Evaluate the model's prediction with a reference score."""
+        """Evaluate the model's prediction with a reference score."""
 
         # evaluation functions
         def spearman_correlation(scores1: pd.Series, scores2: pd.Series):
-            assert set(scores1.index)==set(scores2.index)
+            assert set(scores1.index) == set(scores2.index)
             scores1 = scores1.loc[scores2.index]
-            corr,p= scipy.stats.spearmanr(scores1, scores2)
+            corr, p = scipy.stats.spearmanr(scores1, scores2)
             return corr.item()
 
         def overlap_count(scores1: pd.Series, scores2: pd.Series, topn=50):
-            assert set(scores1.index)==set(scores2.index)
+            assert set(scores1.index) == set(scores2.index)
             scores1 = scores1.sort_values(ascending=False)
             scores2 = scores2.sort_values(ascending=False)
             topn = min(len(scores1), len(scores2), topn)
             overlap = set(scores1.iloc[:topn].index) & set(scores2.iloc[:topn].index)
             return len(overlap)
-        
 
         if "ref_score" in self.df:
             score1 = self.df["ref_score"]
-            score2 = self.df["prediction"]["prediction_pert_mean"]["prediction_expected_classes"]
+            score2 = self.df["prediction"]["prediction_pert_mean"][
+                "prediction_expected_classes"
+            ]
             ## spearman correlation
             corr = spearman_correlation(score1, score2)
             ## overlap count
             ocount_30 = overlap_count(score1, score2, topn=30)
             ocount_50 = overlap_count(score1, score2, topn=50)
             ## save result to yaml
-            return ({
-                "spearman_correlation":corr,
-                "overlap_count_top30":ocount_30,
-                "overlap_count_top50":ocount_50,
-            })
+            return {
+                "spearman_correlation": corr,
+                "overlap_count_top30": ocount_30,
+                "overlap_count_top50": ocount_50,
+            }
         else:
             return dict()
-    
-    def IR_metrics(self,prediction_values,relevant_items):
+
+    def IR_metrics(self, prediction_values, relevant_items):
         """Compute the information retrieval (IR) metrics for the given prediction values and a few relevant items."""
         prediction_values = prediction_values.sort_values(ascending=False)
-        ranked_relevance=pd.Series(np.zeros_like(prediction_values.values),index=prediction_values.index)
-        ranked_relevance.loc[np.intersect1d(relevant_items,ranked_relevance.index)]=1
+        ranked_relevance = pd.Series(
+            np.zeros_like(prediction_values.values), index=prediction_values.index
+        )
+        ranked_relevance.loc[np.intersect1d(relevant_items, ranked_relevance.index)] = 1
         mrr = mean_reciprocal_rank([ranked_relevance.values]).item()
 
         ndcg_50 = ndcg_at_k(ranked_relevance.values, 50).item()
@@ -322,48 +353,63 @@ class PredictionEvaluator(object):
         ndcg_200 = ndcg_at_k(ranked_relevance.values, 200).item()
 
         return {
-            "mean_reciprocal_rank":mrr,
-            "nDCG@50":ndcg_50,
-            "nDCG@100":ndcg_100,
-            "nDCG@150":ndcg_150,
-            "nDCG@200":ndcg_200
+            "mean_reciprocal_rank": mrr,
+            "nDCG@50": ndcg_50,
+            "nDCG@100": ndcg_100,
+            "nDCG@150": ndcg_150,
+            "nDCG@200": ndcg_200,
         }
 
-    def evaluate_with_other_datasets(self,dataset_name):
+    def evaluate_with_other_datasets(self, dataset_name):
         """Compute the model's IR metrics using previous experimental results and the DECCODE pluripotency scores."""
         if dataset_name == "exp_results" and "exp_results" in self.df:
-            prediction_values=self.df["prediction_pert_mean"]["prediction_expected_classes"].sort_values(ascending=False)
-            exp_results=self.df["exp_results"]
-            exp_results["mean_of_count_total_area"]=(exp_results["count"]+exp_results["total_area"])/2
-            exp_results = exp_results.sort_values("mean_of_count_total_area",ascending=True)
-            ranked_relevance=pd.Series(np.zeros_like(prediction_values.values),index=prediction_values.index)
-            metrics = self.IR_metrics(prediction_values,exp_results.index[:10])
+            prediction_values = self.df["prediction_pert_mean"][
+                "prediction_expected_classes"
+            ].sort_values(ascending=False)
+            exp_results = self.df["exp_results"]
+            exp_results["mean_of_count_total_area"] = (
+                exp_results["count"] + exp_results["total_area"]
+            ) / 2
+            exp_results = exp_results.sort_values(
+                "mean_of_count_total_area", ascending=True
+            )
+            ranked_relevance = pd.Series(
+                np.zeros_like(prediction_values.values), index=prediction_values.index
+            )
+            metrics = self.IR_metrics(prediction_values, exp_results.index[:10])
             return metrics
         elif dataset_name == "deccode" and "deccode_plurip_mean" in self.df:
-            prediction_values=self.df["prediction_pert_mean"]["prediction_expected_classes"].sort_values(ascending=False)
-            deccode_plurip_mean=self.df["deccode_plurip_mean"]
-            deccode_plurip_mean = deccode_plurip_mean.sort_values("DECCODE_score",ascending=True)
-            ranked_relevance=pd.Series(np.zeros_like(prediction_values.values),index=prediction_values.index)
-            metrics = self.IR_metrics(prediction_values,deccode_plurip_mean.index[:10])
+            prediction_values = self.df["prediction_pert_mean"][
+                "prediction_expected_classes"
+            ].sort_values(ascending=False)
+            deccode_plurip_mean = self.df["deccode_plurip_mean"]
+            deccode_plurip_mean = deccode_plurip_mean.sort_values(
+                "DECCODE_score", ascending=True
+            )
+            ranked_relevance = pd.Series(
+                np.zeros_like(prediction_values.values), index=prediction_values.index
+            )
+            metrics = self.IR_metrics(prediction_values, deccode_plurip_mean.index[:10])
             return metrics
         else:
             return dict()
-        
+
     def evaluate_diversity(self):
         """Compute the diversity of the model's prediction."""
-        prediction_cat=self.df["prediction_pert_mean"][["class_0","class_1","class_2","class_3"]].values.argmax(axis=1)
+        prediction_cat = self.df["prediction_pert_mean"][
+            ["class_0", "class_1", "class_2", "class_3"]
+        ].values.argmax(axis=1)
         _, counts = np.unique(prediction_cat, return_counts=True)
         freq = counts / counts.sum()
         # entropy of the categories
         ent = scipy.stats.entropy(freq).item()
-        max_ent = scipy.stats.entropy(np.ones_like(freq)/len(freq)).item()
-        return {
-            "entropy_ratio":ent/max_ent
-        }
-    
-    def save_evaluation_score(self,out_dir):
+        max_ent = scipy.stats.entropy(np.ones_like(freq) / len(freq)).item()
+        return {"entropy_ratio": ent / max_ent}
+
+    def save_evaluation_score(self, out_dir):
         """Compute and save the evaluation scores to a yaml file."""
         import yaml
+
         eval_result = dict()
 
         # eval using diversity
@@ -373,11 +419,25 @@ class PredictionEvaluator(object):
         eval_result.update(self.evaluate_with_reference_prediction())
 
         # eval using the IR metrics
-        eval_result.update(( { k+"_exp_results":v for k,v in self.evaluate_with_other_datasets("exp_results").items() } ))
-        eval_result.update(( { k+"_deccode":v for k,v in self.evaluate_with_other_datasets("deccode").items() } ))
+        eval_result.update(
+            (
+                {
+                    k + "_exp_results": v
+                    for k, v in self.evaluate_with_other_datasets("exp_results").items()
+                }
+            )
+        )
+        eval_result.update(
+            (
+                {
+                    k + "_deccode": v
+                    for k, v in self.evaluate_with_other_datasets("deccode").items()
+                }
+            )
+        )
 
         print(eval_result)
 
-        if len(eval_result)>0:
-            with open(os.path.join(out_dir,"eval_result.yaml"),"x") as f:
-                yaml.dump(eval_result,f)
+        if len(eval_result) > 0:
+            with open(os.path.join(out_dir, "eval_result.yaml"), "x") as f:
+                yaml.dump(eval_result, f)
