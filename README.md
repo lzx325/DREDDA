@@ -67,3 +67,11 @@ To test a specific checkpoint, please use
 ```
 python main-DREDDA.py test --ckpt_fp <path_to_checkpoint>
 ```
+
+## Dataset
+By default, the dataset use for training and testing and the checkpoints are hosted on the [Amazon AWS](https://aws.amazon.com/). The same data is also available from Zenodo.
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XYZ.svg)](https://doi.org/10.5281/zenodo.XYZ)
+
+## License
+This work is licensed under the MIT License.
