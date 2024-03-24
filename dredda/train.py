@@ -197,8 +197,8 @@ class DATrainer(object):
                 with open(score_fp,'wb') as f:
                     pkl.dump(scores_dict,f)
 
-                current_model_fp='{}/{}_{}-model-epoch_current.pth'.format(self.model_root,self.source_dataset_name,self.target_dataset_name)
-                torch.save(self.model, current_model_fp)
+                current_model_fp='{}/{}_{}-model-epoch_current.pt'.format(self.model_root,self.source_dataset_name,self.target_dataset_name)
+                torch.save(self.model.state_dict(), current_model_fp)
                 
 
                 accu_s=score_source_train["class_accuracy"]
@@ -208,8 +208,8 @@ class DATrainer(object):
                     best_accu_s = accu_s
                     if Y_target is not None:
                         best_accu_t = accu_t
-                    best_model_fp='{}/{}_{}-model-epoch_best.pth'.format(self.model_root,self.source_dataset_name,self.target_dataset_name)
-                    torch.save(self.model, best_model_fp)
+                    best_model_fp='{}/{}_{}-model-epoch_best.pt'.format(self.model_root,self.source_dataset_name,self.target_dataset_name)
+                    torch.save(self.model.state_dict(), best_model_fp)
             
     def predict(self,X,batch_size=None,return_score=True):
         if batch_size is None:
@@ -521,8 +521,8 @@ class DualBranchDATrainer(object):
                 with open(score_fp,'wb') as f:
                     pkl.dump(scores_dict,f)
 
-                current_model_fp='{}/{}_{}-model-epoch_current.pth'.format(self.model_root,self.source_dataset_name,self.target_dataset_name)
-                torch.save(self.model, current_model_fp)
+                current_model_fp='{}/{}_{}-model-epoch_current.pt'.format(self.model_root,self.source_dataset_name,self.target_dataset_name)
+                torch.save(self.model.state_dict(), current_model_fp)
                 
 
                 accu_s=score_source_train["class_accuracy"]
@@ -532,8 +532,8 @@ class DualBranchDATrainer(object):
                     best_accu_s = accu_s
                     if Y_target is not None:
                         best_accu_t = accu_t
-                    best_model_fp='{}/{}_{}-model-epoch_best.pth'.format(self.model_root,self.source_dataset_name,self.target_dataset_name)
-                    torch.save(self.model, best_model_fp)
+                    best_model_fp='{}/{}_{}-model-epoch_best.pt'.format(self.model_root,self.source_dataset_name,self.target_dataset_name)
+                    torch.save(self.model.state_dict(), best_model_fp)
             
     def predict(self,X,domain,use_dual_branch,batch_size=None,return_score=True):
         if batch_size is None:

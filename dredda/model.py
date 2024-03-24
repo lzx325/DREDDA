@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
-from functions import ReverseLayerF
+from dredda.functions import ReverseLayerF
 from collections import OrderedDict
 
 class FCModelDualBranchAE(nn.Module):

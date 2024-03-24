@@ -35,6 +35,7 @@ The code is tested with the following dependencies:
 - PyTables 3.6.1
 - h5py 2.10.0
 
+To automatically install the package and the dependencies use `pip install -e .` at the root directory of this repo.
 ## Reproducing the LINCS drug list
 To run DREDDA with our pretrained checkpoint, simply use
 ```
@@ -71,7 +72,7 @@ python main-DREDDA.py test --ckpt_fp <path_to_checkpoint>
 ## Dataset
 By default, the dataset use for training and testing and the checkpoints are hosted on the [Amazon AWS](https://aws.amazon.com/). The same data is also available from Zenodo.
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XYZ.svg)](https://doi.org/10.5281/zenodo.XYZ)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10865460.svg)](https://zenodo.org/records/10865460)
 
 ## License
 This work is licensed under the MIT License.

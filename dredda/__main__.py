@@ -11,9 +11,6 @@ import warnings
 import pandas as pd
 import numpy as np
 
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-
 import sklearn
 import sklearn.model_selection
 import sklearn.preprocessing
@@ -30,13 +27,13 @@ import torch.utils.data
 import torchvision
 import torchvision.transforms
 
-import model
+import dredda.model as model
 
-import data
-import test
-import model
-import train
-from download import download_if_not_exist
+import dredda.data as data
+import dredda.test as test
+import dredda.model as model
+import dredda.train as train
+from dredda.download import download_if_not_exist
 
 def get_remote_files_manifest(remote_prefix,local_prefix,fp_list):
     remote_prefix=remote_prefix.rstrip("/")
@@ -54,7 +51,7 @@ remote_files_checksum=dict([
     ("dataset/CRISPRi_LINCS_processed/level5_ae_expectation_logtrans_fs_1000-368.hdf","9391ddb6ea2bdc4b020f7bc6c2bbb341"),
     ("dataset/CRISPRi_LINCS_processed/level5_logtrans_DE_genes.hdf","effba084b678f441d602b89975cd2d6b"),
     ("dataset/LINCS/GSE70138_Broad_LINCS_sig_info_2017-03-06.txt","103b871d39e4872001a7c5a24bcd07e7"),
-    ("checkpoint/CRISPRi_LINCS-model-epoch_best-20210320.pth","5cc5be75bb9ad509fed0ab046a2f9692"),
+    ("checkpoint/CRISPRi_LINCS-model-epoch_best-20210320.pt","40533ad3c8f46a9d179097b558855134"),
     ("dataset/CRISPRi_LINCS_processed/cells_batches_cluster.txt","929c1d08601cbd278c6dca3765b37c05")
 ])
 
@@ -71,8 +68,6 @@ remote_files_manifest=dict(
         )
     )
 )
-
-
 
 def seed_all(seed):
     torch.manual_seed(seed)
@@ -92,8 +87,7 @@ def main_train(args):
         yaml.dump(args.__dict__,f)
     
     # set seed
-    SEED=args.seed
-    seed_all(SEED)
+    seed_all(args.seed)
 
     # load data
     data_dict=data.get_CRISPRi_LINCS_dataset(feature_selection="MI_ae_expectation_1000")
@@ -137,10 +131,6 @@ def main_train(args):
     )
 
 def main_test(args):
-    from torch.serialization import SourceChangeWarning
-    from test import softmax_normalization
-
-    warnings.filterwarnings("ignore",category=SourceChangeWarning)
     test_out_dir=join(args.out_dir,"test")
     os.makedirs(test_out_dir,exist_ok=True)
     
@@ -153,9 +143,8 @@ def main_test(args):
     level5_fs_df_T=level5_fs_df.T
 
     model_fp=args.ckpt_fp
-    model_old=torch.load(model_fp)
     model_new=model.FCModelDualBranchAE(n_in_features=level5_fs_df_T.shape[1])
-    model_new.load_state_dict(model_old.state_dict())
+    model_new.load_state_dict(torch.load(model_fp))
 
     trainer_new=train.DualBranchDATrainer(
         model_new,
@@ -170,33 +159,32 @@ def main_test(args):
 
     level5_pred_raw=trainer_new.predict(level5_fs_df_T.values,"source",True)[0]
 
-    def add_index(pred,feature_df):
-        return pd.DataFrame(pred,index=feature_df.index,columns=["class_%d"%(i) for i in range(pred.shape[1])])
+    def pred_post_process(pred,feature_df):
+        from scipy.special import softmax
+        pred_df = pd.DataFrame(pred,index=feature_df.index,columns=["class_%d"%(i) for i in range(pred.shape[1])])
+        pred_df["prediction_expected_classes"] = pred_df.loc[:,["class_2","class_3"]].sum(axis=1)
+        pred_df=pred_df.apply(softmax,axis=1)
+        return pred_df
     
-    level5_pred_df=add_index(level5_pred_raw,level5_fs_df_T)
+    level5_pred_df=pred_post_process(level5_pred_raw,level5_fs_df_T)
     
     root_dir="download/dataset"
     siginfo_fp = join(root_dir,"LINCS/GSE70138_Broad_LINCS_sig_info_2017-03-06.txt")
-    siginfo_df=pd.read_csv(siginfo_fp,sep='\t',index_col=0)
     exp_results_fp=join(root_dir,"exp_results_single/exp_results_single.csv")
     deccode_plurip_fp=join(root_dir,"others/deccode_plurip.csv")
-
-    random=False
-    if random:
-        level5_pred_df=add_index(np.random.randn(*level5_pred_df.shape),level5_fs_df_T)
 
     lre=test.PredictionEvaluator(
         full_prediction_df=level5_pred_df,
         features_df=level5_fs_df_T,
-        siginfo_df=siginfo_df,
+        siginfo_fp=siginfo_fp,
         ref_score_fp=args.reference_score_fp,
         exp_results_fp=exp_results_fp,
         deccode_plurip_fp=deccode_plurip_fp
     )
 
-    # lre.save_prediction(
-    #     out_dir=test_out_dir
-    # )
+    lre.save_prediction(
+        out_dir=test_out_dir
+    )
 
     lre.save_evaluation_score(
         out_dir=test_out_dir
@@ -217,7 +205,7 @@ def parse_args():
     train_parser.add_argument("--seed",type=int,default=41)
 
     test_parser=subparsers.add_parser("test")
-    test_parser.add_argument("--ckpt_fp",type=str,default=join(local_prefix,"checkpoint/CRISPRi_LINCS-model-epoch_best-20210320.pth"))
+    test_parser.add_argument("--ckpt_fp",type=str,default=join(local_prefix,"checkpoint/CRISPRi_LINCS-model-epoch_best-20210320.pt"))
     test_parser.add_argument("--lincs_level5_fs_table_fp",type=str,default=join(local_prefix,"dataset/CRISPRi_LINCS_processed/level5_ae_expectation_logtrans_fs_1000-368.hdf"))
     test_parser.add_argument("--source_dataset_name",type=str,default="CRISPRi")
     test_parser.add_argument("--target_dataset_name",type=str,default="LINCS")

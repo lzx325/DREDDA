@@ -1,18 +1,11 @@
 import os
 import torch
 import torch.utils.data
-import data
-from torchvision import datasets
-import sklearn.model_selection
-import sklearn.metrics
 import numpy as np
-import matplotlib.pyplot as plt
 import contextlib
-from MulticoreTSNE import MulticoreTSNE as TSNE
 import pandas as pd
 import scipy.stats
-from scipy.special import softmax
-from scipy.stats import rankdata
+
 
 @contextlib.contextmanager
 def temp_seed(seed):
@@ -36,33 +29,6 @@ def check_state_equivalence(param_dict1,param_dict2):
         else:
             max_diff=torch.max(torch.abs(param-param_dict2[name]))
             print("%s: different, max difference: %.5f"%(name,max_diff))
-
-def abline(slope, intercept):
-    """Plot a line from slope and intercept"""
-    axes = plt.gca()
-    x_vals = np.array(axes.get_xlim())
-    y_vals = intercept + slope * x_vals
-    plt.plot(x_vals, y_vals, '--')
-
-def softmax_normalization(level5_pred):
-    level5_pred=level5_pred.apply(softmax,axis=1)
-    return level5_pred
-
-def l1_norm_normalization(level5_pred,level5_fs_df_T,qnorm=False):
-    level5_pred=level5_pred/np.abs(level5_pred).sum(axis=1,keepdims=True)
-    level5_pred=level5_pred[:,2]+level5_pred[:,3]
-    if qnorm:
-        level5_pred=rankdata(level5_pred, 'average')/len(level5_pred)
-    level5_pred_df=pd.DataFrame(level5_pred[:,None],index=level5_fs_df_T.index)
-    return level5_pred_df
-
-def l2_norm_normalization(level5_pred,level5_fs_df_T,qnorm=False):
-    level5_pred=level5_pred/np.linalg.norm(level5_pred,axis=1,keepdims=True)
-    level5_pred=level5_pred[:,2]+level5_pred[:,3]
-    if qnorm:
-        level5_pred=rankdata(level5_pred, 'average')/len(level5_pred)
-    level5_pred_df=pd.DataFrame((level5_pred)[:,None],index=level5_fs_df_T.index)
-    return level5_pred_df
 
 def mean_reciprocal_rank(rs):
     """Score is reciprocal of the rank of the first relevant item
@@ -264,8 +230,7 @@ class PredictionEvaluator(object):
         self,
         full_prediction_df,
         features_df,
-        siginfo_df,
-        expected_classes = ["class_2","class_3"],
+        siginfo_fp,
         ref_score_fp=None,
         exp_results_fp=None,
         deccode_plurip_fp=None
@@ -279,12 +244,11 @@ class PredictionEvaluator(object):
         
         self.df = dict()
         assert set(full_prediction_df.index)==set(features_df.index)
-        full_prediction_df = softmax_normalization(full_prediction_df)
-        self.expected_classes = expected_classes
         self.df["prediction"]=full_prediction_df
         self.df["features"]=features_df
+
+        siginfo_df = pd.read_csv(siginfo_fp,sep='\t',index_col=0)
         self.df["siginfo"]=siginfo_df
-        
         
         if ref_score_fp:
             # evaluation results
@@ -307,9 +271,6 @@ class PredictionEvaluator(object):
         self.compute_DREDDA_score()
 
     def compute_DREDDA_score(self):
-        prediction_expected_classes=self.df["prediction"].loc[:,self.expected_classes].sum(axis=1)
-        self.df["prediction"]["prediction_expected_classes"]=prediction_expected_classes
-
         prediction_df_copy=self.df["prediction"].copy()
         prediction_df_copy.insert(0,"pert_name",self.df["siginfo"]["pert_iname"])
         prediction_df_copy.insert(1,"pert_id",self.df["siginfo"]["pert_id"])
