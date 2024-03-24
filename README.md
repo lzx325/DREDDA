@@ -35,25 +35,25 @@ The code is tested with the following dependencies:
 - PyTables 3.6.1
 - h5py 2.10.0
 
-To automatically install the package and the dependencies use `pip install -e .` at the root directory of this repo.
+To automatically install the package and the dependencies please use `pip install -e .` at the root directory of this repo.
 ## Reproducing the LINCS drug list
 To run DREDDA with our pretrained checkpoint, simply use
 ```
-python main-DREDDA.py test
+python -m dredda test
 ```
 Relavant files will be downloaded to `download/`. The results will (by default) be saved to `train_dir/default_config/test`.
 
 ## Training from scratch
 To train DREDDA with the default configuration, simply use
 ```
-python main-DREDDA.py train
+python -m dredda train
 ```
 
 Relavant files will be downloaded to `download/`. The resulting checkpoints will be saved to `train_dir/default_config/`
 
 The following example shows how to change the default behavior
 ```
-python main-DREDDA.py train \
+python -m dredda train \
   --source_dataset_name CRISPRi \
   --target_dataset_name LINCS \
   --out_dir train_dir/default_config \
@@ -66,7 +66,7 @@ python main-DREDDA.py train \
 
 To test a specific checkpoint, please use
 ```
-python main-DREDDA.py test --ckpt_fp <path_to_checkpoint>
+python -m dredda test --ckpt_fp <path_to_checkpoint>
 ```
 
 ## Dataset

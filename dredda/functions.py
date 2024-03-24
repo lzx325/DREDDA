@@ -1,6 +1,6 @@
 from torch.autograd import Function
 class ReverseLayerF(Function):
-
+    """Gradient reversal layer for Pytorch."""
     @staticmethod
     def forward(ctx, x, alpha):
         ctx.alpha = alpha

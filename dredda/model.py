@@ -5,10 +5,19 @@ from dredda.functions import ReverseLayerF
 from collections import OrderedDict
 
 class FCModelDualBranchAE(nn.Module):
+    """
+    The main model for domain adaptation. This model is a dual-branch autoencoder with a feature extractor, a task classifier, and a domain adversarial classifier.
+    """
     def __init__(self,n_in_features,n_out_classes=4):
+        """
+        :param n_in_features: The number of input features.
+        :param n_out_classes: The number of output classes.
+        """
         super().__init__()
         self.n_in_features=n_in_features
         self.n_out_classes=n_out_classes
+
+        # definition of source domain encoder
         self.ae_encoder_s=nn.Sequential(
             OrderedDict(
                 {
@@ -20,6 +29,7 @@ class FCModelDualBranchAE(nn.Module):
             )
         )
 
+        # definition of target domain encoder
         self.ae_encoder_t=nn.Sequential(
             OrderedDict(
                 {
@@ -31,6 +41,7 @@ class FCModelDualBranchAE(nn.Module):
             )
         )
 
+        # definition of the shared decoder
         self.ae_decoder=nn.Sequential(
             OrderedDict(
                 {
@@ -41,6 +52,7 @@ class FCModelDualBranchAE(nn.Module):
             )
         )
 
+        # definition of the feature extractor
         self.feature=nn.Sequential(
             OrderedDict(
                 {
@@ -54,6 +66,7 @@ class FCModelDualBranchAE(nn.Module):
             )
         )
 
+        # definition of the task classifier
         self.class_classifier=nn.Sequential(
             OrderedDict(
                 {
@@ -66,6 +79,7 @@ class FCModelDualBranchAE(nn.Module):
             )
         )
 
+        # definition of the adv domain classifier
         self.domain_classifier=nn.Sequential(
             OrderedDict(
                 {
@@ -76,6 +90,7 @@ class FCModelDualBranchAE(nn.Module):
             )
         )
     def copy_params_primary_to_dual(self):
+        """Copy the parameters of the primary branch to the dual branch of the autoencoder."""
         self.zero_grad()
         for i in range(len(self.ae_encoder_s)):
             if isinstance(self.ae_encoder_s[i],nn.Linear):
@@ -83,30 +98,52 @@ class FCModelDualBranchAE(nn.Module):
                 self.ae_encoder_t[i].bias.data[:]=self.ae_encoder_s[i].bias[:]
 
     def set_dual_trainable(self,trainable):
+        """Set the dual branch of the autoencoder to be trainable or not."""
         for p in self.ae_encoder_t.parameters():
             p.requires_grad_(trainable)
     
     def forward(self,input_data,domain,use_dual_branch,alpha,return_ddc_features=None):
+        """
+        Forward pass of the model.
+        :param input_data: The input data.
+        :param domain: Either "source" or "target". The domain of the input data.
+        :param use_dual_branch: Whether to use the dual branch of the autoencoder.
+        :param alpha: The coefficient for the gradient reversal layer.
+        :param return_ddc_features: The name of the layer to return the features for the domain adversarial classifier.
+        """
+
         if return_ddc_features is not None:
             assert return_ddc_features in self.class_classifier._modules
         if use_dual_branch:
+            # use the source domain encoder if the domain is source
             if domain == "source":
                 feature=self.ae_encoder_s(input_data)
+            # use the target domain encoder if the domain is target
             elif domain == "target":
                 feature=self.ae_encoder_t(input_data)
             else:
                 assert False
         else:
+            # use the source domain encoder for all data if not using the dual branch
             feature=self.ae_encoder_s(input_data)
+        # apply the shared decoder
         feature=self.ae_decoder(feature)
+
+        # apply the feature extractor
         feature=self.feature(feature)
+
+        # apply the gradient reversal layer
         reverse_feature=ReverseLayerF.apply(feature,alpha)
         class_output=feature
         ddc_features=None
+
+        # sequentially apply the task classifier and get the intermediates
         for k,v in self.class_classifier._modules.items():
             class_output=v(class_output)
             if k==return_ddc_features:
                 ddc_features=class_output
+                
+        # apply the domain adversarial classifier
         domain_output = self.domain_classifier(reverse_feature)
         if return_ddc_features:
             return class_output,domain_output,ddc_features
@@ -114,6 +151,7 @@ class FCModelDualBranchAE(nn.Module):
             return class_output,domain_output
 
     def transform(self,X,domain,use_dual_branch,layer="fc",batch_size=128):
+        """ get the network representation from the model. """
         assert layer in ("feature","fc")
         
         self.eval()

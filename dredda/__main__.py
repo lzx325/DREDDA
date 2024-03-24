@@ -1,12 +1,8 @@
 import os
 from os.path import join
-import sys
-import h5py
 from itertools import chain
 import argparse
 import yaml
-from pprint import pprint
-import warnings
 
 import pandas as pd
 import numpy as np
@@ -19,13 +15,8 @@ import sklearn.manifold
 import sklearn.linear_model
 import sklearn.svm
 
-import scipy.stats
 import torch
-import torch.backends.cudnn as cudnn
-import torch.nn as nn
 import torch.utils.data
-import torchvision
-import torchvision.transforms
 
 import dredda.model as model
 
@@ -106,19 +97,20 @@ def main_train(args):
     trainer=train.DualBranchDATrainer(
         net,source_dataset_name,target_dataset_name,
         net.ae_encoder_t.parameters(),
-        chain(net.ae_encoder_s.parameters(),net.ae_decoder.parameters(),net.feature.parameters(),net.class_classifier.parameters(),net.domain_classifier.parameters()),
+        chain(
+            net.ae_encoder_s.parameters(),
+            net.ae_decoder.parameters(),
+            net.feature.parameters(),
+            net.class_classifier.parameters(),
+            net.domain_classifier.parameters()
+        ),
+        n_epochs = args.n_epochs,
+        domain_adv_coeff = args.domain_adv_coeff,
+        ddc_coeff= args.ddc_coeff,
+        dual_training_epoch= args.dual_training_epoch,
+        save_root = args.out_dir
     )
-    trainer.n_epochs = args.n_epochs
-    trainer.domain_adv_coeff = args.domain_adv_coeff
-    trainer.ddc_coeff= args.ddc_coeff
-    trainer.dual_training_epoch= args.dual_training_epoch
-    trainer.model_root = args.out_dir
-    
-    # trainer.n_epochs=200
-    # trainer.domain_adv_coeff = 0.1
-    # trainer.ddc_coeff= 0.1
-    # trainer.dual_training_epoch=150
-    # trainer.model_root=args.out_dir
+
 
     trainer.fit(
         X_source_train,

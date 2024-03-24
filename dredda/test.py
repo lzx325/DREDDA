@@ -2,33 +2,8 @@ import os
 import torch
 import torch.utils.data
 import numpy as np
-import contextlib
 import pandas as pd
 import scipy.stats
-
-
-@contextlib.contextmanager
-def temp_seed(seed):
-    state = np.random.get_state()
-    np.random.seed(seed)
-    try:
-        yield
-    finally:
-        np.random.set_state(state)
-
-def clone_state(net):
-    params_dict=dict()
-    for name,param in net.state_dict().items():
-        params_dict[name]=param.detach().clone()
-    return params_dict
-
-def check_state_equivalence(param_dict1,param_dict2):
-    for name, param in param_dict1.items():
-        if torch.allclose(param,param_dict2[name]):
-            print("%s: same"%(name))
-        else:
-            max_diff=torch.max(torch.abs(param-param_dict2[name]))
-            print("%s: different, max difference: %.5f"%(name,max_diff))
 
 def mean_reciprocal_rank(rs):
     """Score is reciprocal of the rank of the first relevant item
@@ -226,6 +201,7 @@ def ndcg_at_k(r, k, method=0):
     return dcg_at_k(r, k, method) / dcg_max
 
 class PredictionEvaluator(object):
+    """This class holds the main datasets from LINCS and DECCODE to evaluate the DREDDA model's performance"""
     def __init__(
         self,
         full_prediction_df,
@@ -236,12 +212,6 @@ class PredictionEvaluator(object):
         deccode_plurip_fp=None
         
     ):
-        # root_dir="download/dataset"
-        # level5_fs_table_fp=join(root_dir,"CRISPRi_LINCS_processed/level5_logtrans_DE_genes.hdf")
-        # siginfo_fp = join(root_dir,"LINCS/GSE70138_Broad_LINCS_sig_info_2017-03-06.txt")
-        # self.level5_fs_df_T=pd.read_hdf(level5_fs_table_fp).T
-        # siginfo_df=pd.read_csv(siginfo_fp,sep='\t',index_col=0)
-        
         self.df = dict()
         assert set(full_prediction_df.index)==set(features_df.index)
         self.df["prediction"]=full_prediction_df
@@ -271,6 +241,7 @@ class PredictionEvaluator(object):
         self.compute_DREDDA_score()
 
     def compute_DREDDA_score(self):
+        """Average the model's prediction for each perturbation and cell line."""
         prediction_df_copy=self.df["prediction"].copy()
         prediction_df_copy.insert(0,"pert_name",self.df["siginfo"]["pert_iname"])
         prediction_df_copy.insert(1,"pert_id",self.df["siginfo"]["pert_id"])
@@ -285,17 +256,10 @@ class PredictionEvaluator(object):
         })
     
     def save_prediction(self,out_dir,n_drugs=30):
+        from dredda.helpers import temp_seed
         os.makedirs(out_dir,exist_ok=True)
 
-        # unformatted output
-        if False:
-            import pickle as pkl
-            df_dict_fp = os.path.join(out_dir,"df_dict.pkl")
-            with open(df_dict_fp,"wb") as f:
-                pkl.dump(self.df,f)
-
         # formatted output
-        n_drugs=30
         pert_id_by_iname=self.df["siginfo"].query("pert_type=='trt_cp'").groupby(["pert_iname"])["pert_id"].first()
         concat_df = pd.merge(self.df["prediction_pert_mean"],pert_id_by_iname,left_on="pert_name",right_index=True,how="left").reset_index()
         concat_df["pert_id_and_name"]=concat_df.apply(lambda x: "%s(%s)"%(x["pert_id"],x["pert_name"]), axis=1)
@@ -304,27 +268,14 @@ class PredictionEvaluator(object):
         concat_df.index.name=None
         
 
-        # save full list
+        # save the full list
         fields = ["prediction_expected_classes","pert_id","pert_id_and_name"]
         concat_df[fields].to_csv(os.path.join(out_dir,"full_list.csv"),sep=',')
-        # save top30
-        with open(os.path.join(out_dir,"top30.txt"),"x") as f:
-            print('\n'.join(concat_df["pert_id_and_name"].iloc[:n_drugs].values),file=f)
-        # save top50
-        with open(os.path.join(out_dir,"top50.txt"),"x") as f:
-            print('\n'.join(concat_df["pert_id_and_name"].iloc[:50].values),file=f)
-        # save bottom30
-        with open(os.path.join(out_dir,"bottom30.txt"),"x") as f:
-            print('\n'.join(concat_df["pert_id_and_name"].iloc[-n_drugs:].values),file=f)
-        # save middle30
-        with temp_seed(10):
-            with open(os.path.join(out_dir,"middle30_rand1.txt"),"x") as f:
-                print('\n'.join(concat_df["pert_id_and_name"].iloc[n_drugs:-n_drugs].sample(n_drugs).values),file=f)
-
-            with open(os.path.join(out_dir,"middle30_rand2.txt"),"x") as f:
-                print('\n'.join(concat_df["pert_id_and_name"].iloc[n_drugs:-n_drugs].sample(n_drugs).values),file=f)
+        
     
     def evaluate_with_reference_prediction(self):
+        """ Evaluate the model's prediction with a reference score."""
+
         # evaluation functions
         def spearman_correlation(scores1: pd.Series, scores2: pd.Series):
             assert set(scores1.index)==set(scores2.index)
@@ -359,6 +310,7 @@ class PredictionEvaluator(object):
             return dict()
     
     def IR_metrics(self,prediction_values,relevant_items):
+        """Compute the information retrieval (IR) metrics for the given prediction values and a few relevant items."""
         prediction_values = prediction_values.sort_values(ascending=False)
         ranked_relevance=pd.Series(np.zeros_like(prediction_values.values),index=prediction_values.index)
         ranked_relevance.loc[np.intersect1d(relevant_items,ranked_relevance.index)]=1
@@ -378,6 +330,7 @@ class PredictionEvaluator(object):
         }
 
     def evaluate_with_other_datasets(self,dataset_name):
+        """Compute the model's IR metrics using previous experimental results and the DECCODE pluripotency scores."""
         if dataset_name == "exp_results" and "exp_results" in self.df:
             prediction_values=self.df["prediction_pert_mean"]["prediction_expected_classes"].sort_values(ascending=False)
             exp_results=self.df["exp_results"]
@@ -397,6 +350,7 @@ class PredictionEvaluator(object):
             return dict()
         
     def evaluate_diversity(self):
+        """Compute the diversity of the model's prediction."""
         prediction_cat=self.df["prediction_pert_mean"][["class_0","class_1","class_2","class_3"]].values.argmax(axis=1)
         _, counts = np.unique(prediction_cat, return_counts=True)
         freq = counts / counts.sum()
@@ -408,6 +362,7 @@ class PredictionEvaluator(object):
         }
     
     def save_evaluation_score(self,out_dir):
+        """Compute and save the evaluation scores to a yaml file."""
         import yaml
         eval_result = dict()
 
