@@ -72,20 +72,7 @@ remote_files_manifest=dict(
     )
 )
 
-# evaluation functions
-def spearman_correlation(scores1: pd.Series, scores2: pd.Series):
-    assert set(scores1.index)==set(scores2.index)
-    scores1 = scores1.loc[scores2.index]
-    corr,p= scipy.stats.spearmanr(scores1, scores2)
-    return corr.item()
 
-def overlap_count(scores1: pd.Series, scores2: pd.Series, topn=50):
-    assert set(scores1.index)==set(scores2.index)
-    scores1 = scores1.sort_values(ascending=False)
-    scores2 = scores2.sort_values(ascending=False)
-    topn = min(len(scores1), len(scores2), topn)
-    overlap = set(scores1.iloc[:topn].index) & set(scores2.iloc[:topn].index)
-    return len(overlap)
 
 def seed_all(seed):
     torch.manual_seed(seed)
@@ -151,7 +138,7 @@ def main_train(args):
 
 def main_test(args):
     from torch.serialization import SourceChangeWarning
-    from test import softmax_normalization,l1_norm_normalization,l2_norm_normalization
+    from test import softmax_normalization
 
     warnings.filterwarnings("ignore",category=SourceChangeWarning)
     test_out_dir=join(args.out_dir,"test")
@@ -183,63 +170,38 @@ def main_test(args):
 
     level5_pred_raw=trainer_new.predict(level5_fs_df_T.values,"source",True)[0]
 
+    def add_index(pred,feature_df):
+        return pd.DataFrame(pred,index=feature_df.index,columns=["class_%d"%(i) for i in range(pred.shape[1])])
     
-    level5_pred_df=softmax_normalization(level5_pred_raw,level5_fs_df_T,qnorm=False)
-    lre=test.LINCSRankingEvaluator(level5_pred_df)
-
-    def get_recommendation(lre,save=True):
-        n_drugs=30
-        pert_id_s=lre.siginfo_df.query("pert_type=='trt_cp'").groupby(["pert_iname"])["pert_id"].first()
-        concat_df=(pd.concat([lre.df["prediction"][0],pert_id_s],axis=1))
-        concat_df.columns=["prediction","pert_id"]
-        concat_df=concat_df.sort_values("prediction",ascending=False)
-        concat_df["pert_id_and_name"]=concat_df.apply(lambda x: "%s(%s)"%(x["pert_id"],x.name), axis=1)
-
-        if save:
-            n_drugs=30
-            out_dir=test_out_dir
-            os.makedirs(out_dir,exist_ok=True)
-            # save full list
-            concat_df.to_csv(join(out_dir,"full_list.csv"),sep=',')
-            # save top30
-            with open(join(out_dir,"top30.txt"),"x") as f:
-                print('\n'.join(concat_df["pert_id_and_name"].iloc[:n_drugs].values),file=f)
-            # save top50
-            with open(join(out_dir,"top50.txt"),"x") as f:
-                print('\n'.join(concat_df["pert_id_and_name"].iloc[:50].values),file=f)
-            # save bottom30
-            with open(join(out_dir,"bottom30.txt"),"x") as f:
-                print('\n'.join(concat_df["pert_id_and_name"].iloc[-n_drugs:].values),file=f)
-            # save middle30
-            with test.temp_seed(10):
-                with open(join(out_dir,"middle30_rand1.txt"),"x") as f:
-                    print('\n'.join(concat_df["pert_id_and_name"].iloc[n_drugs:-n_drugs].sample(n_drugs).values),file=f)
-
-                with open(join(out_dir,"middle30_rand2.txt"),"x") as f:
-                    print('\n'.join(concat_df["pert_id_and_name"].iloc[n_drugs:-n_drugs].sample(n_drugs).values),file=f)
+    level5_pred_df=add_index(level5_pred_raw,level5_fs_df_T)
     
-        return concat_df
+    root_dir="download/dataset"
+    siginfo_fp = join(root_dir,"LINCS/GSE70138_Broad_LINCS_sig_info_2017-03-06.txt")
+    siginfo_df=pd.read_csv(siginfo_fp,sep='\t',index_col=0)
+    exp_results_fp=join(root_dir,"exp_results_single/exp_results_single.csv")
+    deccode_plurip_fp=join(root_dir,"others/deccode_plurip.csv")
+
+    random=False
+    if random:
+        level5_pred_df=add_index(np.random.randn(*level5_pred_df.shape),level5_fs_df_T)
+
+    lre=test.PredictionEvaluator(
+        full_prediction_df=level5_pred_df,
+        features_df=level5_fs_df_T,
+        siginfo_df=siginfo_df,
+        ref_score_fp=args.reference_score_fp,
+        exp_results_fp=exp_results_fp,
+        deccode_plurip_fp=deccode_plurip_fp
+    )
+
+    # lre.save_prediction(
+    #     out_dir=test_out_dir
+    # )
+
+    lre.save_evaluation_score(
+        out_dir=test_out_dir
+    )
     
-    concat_df=get_recommendation(lre)
-
-    if args.reference_score_fp:
-        # evaluation results
-        score1 = pd.read_csv(args.reference_score_fp, index_col=0)["prediction"]
-        score2 = concat_df["prediction"]
-        ## spearman correlation
-        corr = spearman_correlation(score1, score2)
-        ## overlap count
-        ocount_30 = overlap_count(score1, score2, topn=30)
-        ocount_50 = overlap_count(score1, score2, topn=50)
-        ## save result to yaml
-        with open(join(test_out_dir,"eval_result.yaml"),"x") as f:
-            yaml.dump({
-                "spearman_correlation":corr,
-                "overlap_count_top30":ocount_30,
-                "overlap_count_top50":ocount_50,
-            },f
-        )
-
 
 def parse_args():
     parser=argparse.ArgumentParser()
@@ -261,6 +223,7 @@ def parse_args():
     test_parser.add_argument("--target_dataset_name",type=str,default="LINCS")
     test_parser.add_argument("--out_dir",type=str,default="train_dir/default_config")
     test_parser.add_argument("--reference_score_fp",type=str,default=None)
+
     return parser.parse_args()
 
 if __name__=="__main__":
