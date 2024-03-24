@@ -6,6 +6,7 @@ setup(
     author="Zhongxiao Li",
     author_email="lzx325@outlook.com",
     description="Drug Repositioning through Expression Data Domain Adaptation",
+    keywords="drug repositioning, domain adaptation",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/lzx325/DREDDA",
@@ -14,6 +15,7 @@ setup(
         "Programming Language :: Python :: 3.7",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
+        "Development Status :: 3 - Alpha"
     ],
     python_requires=">=3.7.10",
     install_requires=[
