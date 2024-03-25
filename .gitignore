@@ -1,4 +1,7 @@
 train_dir/
 download/
 __pycache__/
-notebooks/
+notebooks/ignore/
+run.sh
+*.egg-info/
+**/.ipynb_checkpoints/
