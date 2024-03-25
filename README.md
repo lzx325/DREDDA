@@ -75,7 +75,7 @@ python -m dredda test --ckpt_fp <path_to_checkpoint>
 ```
 
 ## Dataset
-By default, the dataset use for training and testing and the checkpoints are hosted on the [Amazon AWS](https://aws.amazon.com/). The same data is also available from Zenodo.
+By default, the dataset used for training and testing and the checkpoints are hosted on the Amazon AWS, which will be automatically downloaded by the scripts. The same data is also available from Zenodo.
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10865460.svg)](https://zenodo.org/records/10865460)
 
