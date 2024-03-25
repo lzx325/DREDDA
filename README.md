@@ -43,6 +43,11 @@ python -m dredda test
 ```
 Relavant files will be downloaded to `download/`. The results will (by default) be saved to `train_dir/default_config/test`.
 
+## Jupyter notebooks for interactive analysis
+We have provided Jupyter notebooks under `notebooks/` directory which contains
+  - an example of reproducing the LINCS drugs list using the pretrained checkpoint 
+  - an example of training on a small dummy example.
+
 ## Training from scratch
 To train DREDDA with the default configuration, simply use
 ```
