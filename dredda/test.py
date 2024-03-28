@@ -409,6 +409,7 @@ class PredictionEvaluator(object):
     def save_evaluation_score(self, out_dir):
         """Compute and save the evaluation scores to a yaml file."""
         import yaml
+        from dredda.helpers import iprint_dict
 
         eval_result = dict()
 
@@ -436,8 +437,9 @@ class PredictionEvaluator(object):
             )
         )
 
-        print(eval_result)
+        iprint_dict(eval_result)
 
         if len(eval_result) > 0:
             with open(os.path.join(out_dir, "eval_result.yaml"), "x") as f:
                 yaml.dump(eval_result, f)
+        return(eval_result)
