@@ -12,12 +12,12 @@ setup(
     url="https://github.com/lzx325/DREDDA",
     packages=["dredda"],
     classifiers=[
-        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Development Status :: 3 - Alpha"
     ],
-    python_requires=">=3.7.10",
+    python_requires=">=3.8",
     install_requires=[
         "torch==1.6.0",
         "torchvision==0.7.0",
